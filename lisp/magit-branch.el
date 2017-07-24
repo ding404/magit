@@ -457,8 +457,7 @@ those, otherwise prompt for a single branch to be deleted,
 defaulting to the branch at point."
   ;; One would expect this to be a command as simple as, for example,
   ;; `magit-branch-rename'; but it turns out everyone wants to squeeze
-  ;; a bit of extra functionality into this one.  And once it's there,
-  ;; you cannot remove it anymore. (I tried, it causes protests.)
+  ;; a bit of extra functionality into this one, including myself.
   (interactive
    (let ((branches (magit-region-values 'branch))
          (force current-prefix-arg))
@@ -504,8 +503,9 @@ defaulting to the branch at point."
          magit-this-process
          (apply-partially 'magit-delete-remote-branch-sentinel refs))))
      ((> (length branches) 1)
-      (magit-run-git "branch" (if force "-D" "-d")
-                     (delete (magit-get-current-branch) branches)))
+      (setq branches (delete (magit-get-current-branch) branches))
+      (mapc 'magit-branch-maybe-delete-pr-remote branches)
+      (magit-run-git "branch" (if force "-D" "-d") branches))
      (t ; And now for something completely different.
       (let* ((branch (car branches))
              (prompt (format "Branch %s is checked out.  " branch)))
@@ -537,9 +537,29 @@ defaulting to the branch at point."
                      (magit-call-git "checkout" "master"))
             (`abort  (user-error "Abort")))
           (setq force t))
+        (magit-branch-maybe-delete-pr-remote branch)
         (magit-run-git "branch" (if force "-D" "-d") branch))))))
 
 (put 'magit-branch-delete 'interactive-only t)
+
+(defun magit-branch-maybe-delete-pr-remote (branch)
+  (let* ((remote   (magit-get "branch" branch "pullRequestRemote"))
+         (variable (format "remote.%s.fetch" remote))
+         (refspecs (magit-get-all variable))
+         (refspec  (magit-get "branch" branch "merge"))
+         (refspec  (and refspec
+                        (string-prefix-p "refs/heads/" refspec)
+                        (substring refspec 11)))
+         (refspec  (and refspec
+                        (format "+refs/heads/%s:refs/remotes/%s/%s"
+                                refspec remote refspec))))
+    (when (and (not (member (format "+refs/heads/*:refs/remotes/%s/*" remote)
+                            refspecs))
+               (member refspec refspecs))
+      (if (= (length refspecs) 1)
+          (magit-call-git "remote" "rm" remote)
+        (magit-call-git "config" "--unset" variable
+                        (regexp-quote refspec))))))
 
 (defun magit-delete-remote-branch-sentinel (refs process event)
   (when (memq (process-status process) '(exit signal))
