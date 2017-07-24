@@ -3657,6 +3657,10 @@ features are available from separate popups.
   branch.  If FROM is not reachable from ~HEAD~ or is reachable from the
   source branch's upstream, then an error is raised.
 
+- Key: b p, magit-branch-pull-request
+
+  TODO
+
 - Key: b x, magit-branch-reset
 
   This command resets a branch, defaulting to the branch at point, to

@@ -115,6 +115,8 @@ Changes since v2.10.3
 
 * TODO `magit-browse-pull-request'
 
+* TODO `magit-branch-pull-request'
+
 Fixes since v2.10.3
 -------------------
 

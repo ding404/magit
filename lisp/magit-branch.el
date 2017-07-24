@@ -169,7 +169,8 @@ and change branch related variables."
              (?m "Rename"                magit-branch-rename)
              (?w "Checkout new worktree" magit-worktree-checkout)
              (?W "Create new worktree"   magit-worktree-branch)
-             (?x "Reset"                 magit-branch-reset) nil nil
+             (?x "Reset"                 magit-branch-reset) nil
+             (?r "Create from pull-request" magit-branch-pull-request)
              (?k "Delete"                magit-branch-delete))
   :default-action 'magit-checkout
   :max-action-columns 3
@@ -240,6 +241,84 @@ changes.
 \n(git checkout --orphan [ARGS] BRANCH START-POINT)."
   (interactive (magit-branch-read-args "Create and checkout orphan branch"))
   (magit-run-git "checkout" "--orphan" args branch start-point))
+
+;;;###autoload
+(defun magit-branch-pull-request (pr)
+  "Create a new branch from a pull request.
+
+Currently this only supports Github, but that restriction will
+be lifted eventually to support other Git forges.
+
+The remote named \"origin\" is assumed to be the upstream.
+If that is not correct, then you have to set the Git variable
+`magit.upstream' to the appropriate remote name.
+
+Also set the following Git variables:
+  `remote.<fork>.fetch'
+    Set value so that only the pull-request branch is fetched.
+    If the remote already exists, then add a new value.  If the
+    remote already exists, and the value contains the default
+    refspec, then leave this untouched.
+  `branch.<name>.pullRequest'
+    Set the value to the pull-request number.
+  `branch.<name>.description'
+    Set the value to the pull-request title."
+  (interactive (list (magit-read-pull-request "Branch pull request")))
+  (let* ((origin   (magit-upstream-repository))
+         (base     (cdr (assq 'base    pr)))
+         (head     (cdr (assq 'head    pr)))
+         (number   (cdr (assq 'number  pr)))
+         (branch   (cdr (assq 'ref     head)))
+         (repo     (cdr (assq 'repo    head)))
+         (remote   (cdr (assq 'login   (cdr (assq 'owner repo)))))
+         (base-ref (cdr (assq 'ref     base)))
+         (base-url (magit-get "remote" origin "url"))
+         (ssh-url  (cdr (assq 'ssh_url repo)))
+         (git-url  (cdr (assq 'git_url repo)))
+         (head-url (if (string-prefix-p "git@" base-url) ssh-url git-url))
+         (remote-branch branch))
+    (when (member branch
+                  (list base-ref
+                        (cdr (assq 'default_branch base))))
+      (setq branch (format "pr-%s" number)))
+    (when (magit-branch-p branch)
+      (user-error "Branch `%s' already exists" branch))
+    (if (equal head-url base-url)
+        (let ((inhibit-magit-refresh t))
+          (magit-branch branch (concat origin "/" remote-branch)))
+      (if (magit-remote-p remote)
+          (let ((url   (magit-get     "remote" remote "url"))
+                (fetch (magit-get-all "remote" remote "fetch")))
+            (unless (member url (list ssh-url git-url))
+              (user-error
+               "Remote `%s' already exists and its url \"%s\" is unexpected"
+               remote url))
+            (unless (member (format "+refs/heads/*:refs/remotes/%s/*" remote)
+                            fetch)
+              (magit-call-git "remote" "set-branches"
+                              "--add" remote remote-branch)
+              (magit-call-git "fetch" remote)))
+        (magit-call-git "remote" "add" "-f" "--no-tags"
+                        "-t" remote-branch remote head-url))
+      (magit-call-git "branch" branch
+                      (concat remote "/" remote-branch))
+      (magit-call-git "branch" branch
+                      (concat "--set-upstream-to="
+                              (if t ; TODO magit-branch-prefer-local ?
+                                  base-ref
+                                (concat origin "/" base-ref))))
+      (magit-set "true" "branch" branch "rebase")
+      (cond ((not (equal branch remote-branch)))
+            ((cdr (assq 'locked pr))
+             (magit-set origin "branch" branch "pushRemote"))
+            ((magit-get "remote.pushDefault")
+             (magit-set remote "branch" branch "pushRemote")))
+      (magit-set remote "branch" branch "pullRequestRemote"))
+    (magit-set (number-to-string number)
+               "branch" branch "pullRequest")
+    (magit-set (cdr (assq 'title pr))
+               "branch" branch "description")
+    (magit-refresh)))
 
 (defun magit-branch-read-args (prompt)
   (let ((args (magit-branch-arguments)))
