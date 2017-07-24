@@ -113,6 +113,8 @@ Changes since v2.10.3
   of "BRANCH_DESCRIPTION" for editing a branch's description as of Git
   2.13.0.  #3149
 
+* TODO `magit-browse-pull-request'
+
 Fixes since v2.10.3
 -------------------
 
