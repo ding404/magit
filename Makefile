@@ -195,6 +195,7 @@ define set_package_requires
     (let ((s (read (buffer-substring (point) (line-end-position)))))
       (--when-let (assq (quote async)       s) (setcdr it (list async-version)))
       (--when-let (assq (quote dash)        s) (setcdr it (list dash-version)))
+      (--when-let (assq (quote ghub)        s) (setcdr it (list ghub-version)))
       (--when-let (assq (quote with-editor) s) (setcdr it (list with-editor-version)))
       (--when-let (assq (quote git-commit)  s) (setcdr it (list git-commit-version)))
       (--when-let (assq (quote magit-popup) s) (setcdr it (list magit-popup-version)))
@@ -222,6 +223,7 @@ bump-versions-1:
 	@$(BATCH) --eval "(progn\
         (setq async-version \"$(ASYNC_VERSION)\")\
         (setq dash-version \"$(DASH_VERSION)\")\
+        (setq ghub-version \"$(GHUB_VERSION)\")\
         (setq with-editor-version \"$(WITH_EDITOR_VERSION)\")\
         (setq git-commit-version \"$(GIT_COMMIT_VERSION)\")\
         (setq magit-popup-version \"$(MAGIT_POPUP_VERSION)\")\
@@ -232,6 +234,7 @@ bump-snapshots:
 	@$(BATCH) --eval "(progn\
         (setq async-version \"$(ASYNC_MELPA_SNAPSHOT)\")\
         (setq dash-version \"$(DASH_MELPA_SNAPSHOT)\")\
+        (setq ghub-version \"$(GHUB_SNAPSHOT)\")\
         (setq with-editor-version \"$(WITH_EDITOR_MELPA_SNAPSHOT)\")\
         (setq git-commit-version \"$(GIT_COMMIT_MELPA_SNAPSHOT)\")\
         (setq magit-popup-version \"$(MAGIT_POPUP_MELPA_SNAPSHOT)\")\
