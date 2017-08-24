@@ -545,21 +545,22 @@ defaulting to the branch at point."
 (defun magit-branch-maybe-delete-pr-remote (branch)
   (let* ((remote   (magit-get "branch" branch "pullRequestRemote"))
          (variable (format "remote.%s.fetch" remote))
-         (refspecs (magit-get-all variable))
-         (refspec  (magit-get "branch" branch "merge"))
-         (refspec  (and refspec
-                        (string-prefix-p "refs/heads/" refspec)
-                        (substring refspec 11)))
-         (refspec  (and refspec
-                        (format "+refs/heads/%s:refs/remotes/%s/%s"
-                                refspec remote refspec))))
-    (when (and (not (member (format "+refs/heads/*:refs/remotes/%s/*" remote)
-                            refspecs))
-               (member refspec refspecs))
-      (if (= (length refspecs) 1)
-          (magit-call-git "remote" "rm" remote)
-        (magit-call-git "config" "--unset" variable
-                        (regexp-quote refspec))))))
+         (refspecs (magit-get-all variable)))
+    (unless (member (format "+refs/heads/*:refs/remotes/%s/*" remote) refspecs)
+      (let ((refspec (if (equal (magit-get "branch" branch "pushRemote") remote)
+                         (format "+refs/heads/%s:refs/remotes/%s/%s"
+                                 branch remote branch)
+                       (let ((merge (magit-get "branch" branch "merge")))
+                         (and merge
+                              (string-prefix-p "refs/heads/" merge)
+                              (setq merge (substring merge 11))
+                              (format "+refs/heads/%s:refs/remotes/%s/%s"
+                                      merge remote merge))))))
+        (when (member refspec refspecs)
+          (if (= (length refspecs) 1)
+              (magit-call-git "remote" "rm" remote)
+            (magit-call-git "config" "--unset" variable
+                            (regexp-quote refspec))))))))
 
 (defun magit-delete-remote-branch-sentinel (refs process event)
   (when (memq (process-status process) '(exit signal))
